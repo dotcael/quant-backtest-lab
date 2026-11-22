@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
+import os
 import sys
 import urllib.request
 from datetime import datetime, timezone
@@ -47,7 +48,7 @@ MAP_CSV = ROOT / "data/insider/map/insider_map.csv"
 NORM_CSV = ROOT / "data/insider/congress_trades_norm.csv"
 EVENTS_CSV = ROOT / "data/insider/events.csv"
 PRICE_CACHE = ROOT / "data/insider/watch_cache"
-NTFY_TOPIC = "https://ntfy.sh/quant-insider"
+NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "")
 
 
 def fetch_kadoa() -> list[dict]:
@@ -76,7 +77,7 @@ def load_state() -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--dry-run", action="store_true", help="no state write, no ntfy")
-    ap.add_argument("--ntfy", action="store_true", help="push alerts to ntfy.sh/quant-insider")
+    ap.add_argument("--ntfy", action="store_true", help="push alerts to the NTFY_TOPIC endpoint set in the environment")
     ap.add_argument("--bootstrap", action="store_true",
                     help="seed seen_keys from norm CSV before diffing (first run only)")
     args = ap.parse_args()
@@ -145,7 +146,7 @@ def main() -> int:
                      "not an accusation. Verify against the primary filing before anything else._\n")
         with open(ALERTS_MD, "a") as f:
             f.write("\n".join(lines))
-        if args.ntfy and not args.dry_run:
+        if args.ntfy and not args.dry_run and NTFY_TOPIC:
             for r in alerts.itertuples():
                 msg = f"insider-watch: {r.person} {r.transaction_type} {r.ticker} {r.transaction_date} composite {r.composite:.3f} (≥P99)"
                 subprocess.run(["curl", "-s", "-d", msg, NTFY_TOPIC], timeout=30)
